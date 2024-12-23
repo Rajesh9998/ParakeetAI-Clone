@@ -1,6 +1,6 @@
 # ParakeetAI - Live  Question Answering Tool
 
-ParakeetAI is a versatile web application designed to capture live audio from your browser tab and microphone. This tool goes beyond basic transcription by integrating question answering and dialog analysis. It utilizes Deepgram for real-time transcription, Groq for intelligent question routing and answering, Pinecone for RAG capabilities and DuckDuckGo for up-to-date information.
+>ParakeetAI is a versatile web application designed to capture live audio from your browser tab and microphone. This tool goes beyond basic transcription by integrating question answering and dialog analysis. It utilizes Deepgram for real-time transcription, Groq for intelligent question routing and answering, Pinecone for RAG capabilities and DuckDuckGo for up-to-date information.
 
 ## Here’s a quick demo:
 
