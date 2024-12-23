@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Transcription Tool</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
+     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+        integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+             padding: 20px;
+             background-color: #f0f2f5;
+            color: #343a40;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .container{
+             width: 90%; /* Keep it a bit narrower than the viewport */
+             max-width: 1200px; /* Set a maximum width */
+              display: flex;
+              flex-direction: column;
+        }
+       .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .controls button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+          .controls button:hover {
+            background-color: #0056b3;
+         }
+         #video-transcript-container {
+                display: flex;
+                justify-content: space-between;
+                width: 100%;
+                margin-bottom: 20px;
+        }
+
+        #videoDisplay {
+            width: 30%;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: block;
+        }
+
+
+          .transcript-container {
+            width: 30%;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+             padding: 10px;
+         }
+
+           .qa-container {
+            width: 30%;
+              display: flex;
+             flex-direction: column;
+              border: 1px solid #dee2e6;
+              border-radius: 8px;
+             background-color: white;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+              padding: 10px;
+        }
+
+
+         .transcript-container h3,  .qa-container h3 {
+             text-align: center;
+             margin-bottom: 10px;
+         }
+
+          .transcript-container p, .qa-container p {
+            white-space: pre-line;
+            padding: 10px;
+          }
+         .controls .fa-solid{
+             margin-right: 10px; /* Space to the right of the input */
+          }
+         #analysis-container {
+            width: 90%;
+            max-width: 1200px;
+            margin-top: 20px;
+             background-color: white;
+              border: 1px solid #dee2e6;
+              border-radius: 8px;
+             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+             padding: 10px;
+            overflow-y: auto; /* Makes the container scrollable */
+            max-height: 300px; /* Maximum height for the analysis display */
+        }
+         #analysis-container h2 {
+            text-align: center;
+            margin-bottom: 10px;
+
+        }
+         #analysis-container p {
+            white-space: pre-line;
+            padding: 10px;
+         }
+
+    </style>
+</head>
+<body>
+     <div class="container">
+    <h1>Live Transcription</h1>
+    <div class="controls">
+
+       <button id="start"><i class="fa-solid fa-video"></i>Start Sharing & Transcription</button>
+         <button id="clear"><i class="fa-solid fa-broom"></i>Clear</button>
+       <button id="generate"><i class="fa-solid fa-magic"></i>Generate</button>
+       <button id="stop"><i class="fa-solid fa-stop"></i>Stop Transcription</button>
+        <button id="analyze"><i class="fa-solid fa-magnifying-glass"></i>Analyze</button>
+
+    </div>
+
+    <div id="video-transcript-container">
+
+        <video id="videoDisplay" controls autoplay></video>
+        <div class="transcript-container">
+             <h3>Tab Audio Transcript</h3>
+             <p id="transcript"></p>
+        <h3>Microphone Audio Transcript</h3>
+           <p id="micTranscript"></p>
+        </div>
+        <div class="qa-container">
+              <h3>Generated Question</h3>
+             <p id="question"></p>
+             <h3>Answer</h3>
+             <p id="answer"></p>
+        </div>
+    </div>
+     <div id="analysis-container">
+           <h2>Analysis</h2>
+            <p id="analysis-output"></p>
+    </div>
+
+    </div>
+
+   <script>
+       const DG_API_KEY = "DEEPGRAM_API_KEY"; // Replace with your actual API key
+       let tabSocket;
+        let recorder;
+        let videoDisplay = document.getElementById('videoDisplay');
+        let stream;
+        let mixedStream;
+        let micSocket;
+        let micMediaRecorder;
+       let tabTranscription = "";
+       let micTranscription = "";
+       let tabStoredTranscription = "";
+       let micStoredTranscription = "";
+
+
+
+         document.getElementById('start').addEventListener('click', async () => {
+
+            if (!DG_API_KEY) {
+                alert('Please provide a Deepgram API Key.');
+                return;
+            }
+            // Begin tab stream
+            try {
+              stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+
+                 console.log("Stream Tracks:", stream.getTracks())
+                if(!stream.getAudioTracks().length) {
+                    alert('You must share your tab with audio. Refresh the page and try again.')
+                    return;
+                 }
+
+                   videoDisplay.srcObject = stream;
+                   videoDisplay.onloadedmetadata = () => {
+                      videoDisplay.play();
+                   };
+
+
+
+                 const audioContext = new AudioContext();
+                if (stream.getAudioTracks().length > 0) {
+                     const source = audioContext.createMediaStreamSource(stream);
+                     const dest = audioContext.createMediaStreamDestination();
+                     source.connect(dest);
+                     mixedStream = dest.stream;
+                  } else {
+                   mixedStream = stream;
+                  }
+
+
+               const mimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg", "audio/mpeg"];
+                let mimeType;
+                  for (const type of mimeTypes) {
+                     if (MediaRecorder.isTypeSupported(type)) {
+                         mimeType = type;
+                         break;
+                      }
+                 }
+                 if(!mimeType) return alert("None of the required mime types are available on your browser")
+                 recorder = new MediaRecorder(mixedStream, { mimeType: mimeType });
+
+
+                   tabSocket = new WebSocket(`wss://api.deepgram.com/v1/listen?tier=enhanced`, ['token', DG_API_KEY]);
+
+                recorder.addEventListener('dataavailable', evt => {
+                  if (evt.data.size > 0 && tabSocket.readyState === WebSocket.OPEN) {
+                        tabSocket.send(evt.data);
+                    }
+                 });
+
+                   tabSocket.onopen = () => {
+                    recorder.start(250); // Start recording every 250ms
+                      console.log("deepgram tab socket connection opened");
+
+                    };
+
+
+                    tabSocket.onmessage = msg => {
+                    console.log("Deepgram message received")
+                      const { transcript } = JSON.parse(msg.data)?.channel?.alternatives[0] || {};
+                        if (transcript) {
+                            tabTranscription += transcript + " ";
+                        document.getElementById('transcript').textContent += transcript + ' ';
+                       }
+                  };
+
+
+                     tabSocket.onerror = error => {
+                      console.error('WebSocket error:', error);
+                      alert('There was a problem connecting to Deepgram. Check the console.');
+                   }
+
+
+                   tabSocket.onclose = event => {
+                   console.log(`Socket closing, code=${event.code}, reason=${event.reason}`);
+                      if (event.wasClean) {
+                      console.log(`Closed cleanly, code=${event.code}, reason=${event.reason}`);
+                      } else {
+                      console.error('Connection died');
+                      }
+                   };
+
+             } catch (error) {
+               console.error('Error accessing media devices:', error);
+                alert('Could not start sharing screen and audio.' + error);
+           }
+
+        //Begin microphone stream
+          try {
+              const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                 micSocket = new WebSocket('ws://localhost:5556/listen') // Correct port here
+                 micMediaRecorder = new MediaRecorder(micStream);
+
+             micSocket.onopen = () => {
+                 document.querySelector('#micTranscript').textContent = ''
+                    console.log({
+                        event: 'micSocket onopen'
+                     })
+                 micMediaRecorder.addEventListener('dataavailable', async (event) => {
+                   if (event.data.size > 0 && micSocket.readyState == 1) {
+                      micSocket.send(event.data)
+                      }
+                 })
+                    micMediaRecorder.start(250)
+               }
+
+              micSocket.onmessage = (message) => {
+                  const received = message.data
+                   if (received) {
+                      console.log("message from python server", received)
+                       micTranscription += received + " ";
+                         document.querySelector('#micTranscript').textContent += ' ' + received
+                   }
+                 }
+
+                micSocket.onclose = () => {
+                    console.log({
+                         event: 'micSocket onclose'
+                    })
+               }
+
+                micSocket.onerror = (error) => {
+                  console.log({
+                    event: 'micSocket onerror',
+                      error
+                    })
+                 }
+           } catch(error) {
+            console.error("Could not start microphone stream", error)
+           alert('Could not start microphone stream' + error)
+            }
+        });
+        document.getElementById('generate').addEventListener('click', async () => {
+
+            try {
+                const dialogues = document.getElementById('transcript').textContent;
+                 const response = await fetch('/generate', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                 },
+                body: JSON.stringify({ dialogues }),
+             });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                 }
+
+                 const data = await response.json();
+                   const question = data.question;
+                  const answer = data.answer;
+
+
+                   document.getElementById('question').textContent = question;
+                  document.getElementById('answer').textContent = answer;
+              } catch (error) {
+                  console.error('Error fetching question or answer:', error);
+                  document.getElementById('question').textContent = "Error in getting question";
+                  document.getElementById('answer').textContent = "Error in getting answer";
+
+                }
+       });
+       document.getElementById('clear').addEventListener('click', () => {
+            tabStoredTranscription += tabTranscription;
+            micStoredTranscription += micTranscription;
+            tabTranscription = "";
+            micTranscription = "";
+             document.getElementById('transcript').textContent = "";
+             document.getElementById('micTranscript').textContent = "";
+            alert('Transcript cleared.');
+        });
+        document.getElementById('analyze').addEventListener('click', async () => {
+         // Append any current transcriptions to the stored variables
+            tabStoredTranscription += tabTranscription;
+            micStoredTranscription += micTranscription;
+
+         const tabAnalysisTranscript = tabStoredTranscription;
+          const micAnalysisTranscript = micStoredTranscription;
+        console.log("tabAnalysisTranscript to be sent:", tabAnalysisTranscript)
+        console.log("micAnalysisTranscript to be sent:", micAnalysisTranscript)
+       try{
+
+               const response = await fetch('/analyze',{
+                  method: 'POST',
+                     headers: {
+                       'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                          tabAnalysisTranscript, micAnalysisTranscript
+                         })
+                    });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+           const data = await response.json();
+           const analysisOutput = data.analysis;
+
+             document.getElementById('analysis-output').textContent = analysisOutput
+       }catch(error){
+            console.error("error while getting analysis", error);
+          document.getElementById('analysis-output').textContent = "Error getting Analysis."
+
+        }
+   });
+        document.getElementById('stop').addEventListener('click', () => {
+            // Stop Tab Audio
+             if (recorder) {
+                 recorder.stop();
+                recorder = null;
+             }
+             if (tabSocket && tabSocket.readyState === WebSocket.OPEN) {
+                tabSocket.close();
+                }
+              if(stream){
+                 stream.getTracks().forEach(track => track.stop());
+                videoDisplay.srcObject = null;
+               }
+            if(mixedStream){
+              mixedStream.getTracks().forEach(track => track.stop());
+              }
+
+             // Stop Microphone Audio
+
+            if (micMediaRecorder) {
+                    micMediaRecorder.stop()
+                micMediaRecorder = null
+              }
+           if (micSocket && micSocket.readyState === WebSocket.OPEN) {
+              micSocket.close()
+                }
+
+
+            alert('Transcription ended.');
+           });
+
+    </script>
+</body>
+</html>
