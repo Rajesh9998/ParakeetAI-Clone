@@ -1,0 +1,7 @@
+duckduckgo-search
+flask
+deepgram
+python-dotenv
+pinecone 
+pinecone-plugin-assistant
+groq
