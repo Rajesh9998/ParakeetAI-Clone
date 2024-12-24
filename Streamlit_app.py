@@ -175,7 +175,7 @@ def web_search(query):
     Returns:
         str: A summarized version of the search results.
     """
-    client = LinkupClient(api_key="49e764c1-7231-4250-96db-1caa651d6f18")
+    client = LinkupClient(api_key=LINKUP_API_KEY)
 
     response = client.search(
     query="what is current weather in Mumbai",
